@@ -1,6 +1,9 @@
 package com.jwt.security.auth;
 
 import com.jwt.security.config.JWTService;
+import com.jwt.security.token.Token;
+import com.jwt.security.token.TokenRepository;
+import com.jwt.security.token.TokenType;
 import com.jwt.security.user.Role;
 import com.jwt.security.user.User;
 import com.jwt.security.user.UserRepository;
@@ -16,6 +19,8 @@ public class AuthenticationService {
 
     private final UserRepository repository;
 
+    private final TokenRepository tokenRepository;
+
     private final PasswordEncoder passwordEncoder;
 
     private final JWTService jwtService;
@@ -24,14 +29,15 @@ public class AuthenticationService {
 
     public AuthenticationResponse register(RegisterRequest request) {
         var user = User.builder()
-                .firstname(request.getFirstName())
-                .lastname(request.getLastName())
+                .firstname(request.getFirstname())
+                .lastname(request.getLastname())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(Role.USER)
                 .build();
-        repository.save(user);
+        var savedUser = repository.save(user);
         var jwtToken = jwtService.generateToken(user);
+        saveUserToken(savedUser, jwtToken);
         return AuthenticationResponse.builder()
                 .token(jwtToken)
                 .build();
@@ -47,8 +53,32 @@ public class AuthenticationService {
         var user = repository.findByEmail(request.getEmail())
                 .orElseThrow();
         var jwtToken = jwtService.generateToken(user);
+        revokeAllUserTokens(user);
+        saveUserToken(user, jwtToken);
         return AuthenticationResponse.builder()
                 .token(jwtToken)
                 .build();
+    }
+
+    private void saveUserToken(User user, String jwtToken) {
+        var token = Token.builder()
+                .user(user)
+                .token(jwtToken)
+                .tokenType(TokenType.BEARER)
+                .revoked(false)
+                .expired(false)
+                .build();
+        tokenRepository.save(token);
+    }
+
+    private void revokeAllUserTokens(User user) {
+        var validUserToken = tokenRepository.findAllValidTokensByUser(user.getId());
+        if (validUserToken.isEmpty())
+            return;
+        validUserToken.forEach(t -> {
+            t.setExpired(true);
+            t.setRevoked(true);
+        });
+        tokenRepository.saveAll(validUserToken);
     }
 }
