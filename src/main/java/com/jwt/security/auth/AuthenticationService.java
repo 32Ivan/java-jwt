@@ -5,7 +5,6 @@ import com.jwt.security.config.JWTService;
 import com.jwt.security.token.Token;
 import com.jwt.security.token.TokenRepository;
 import com.jwt.security.token.TokenType;
-import com.jwt.security.user.Role;
 import com.jwt.security.user.User;
 import com.jwt.security.user.UserRepository;
 import jakarta.servlet.http.HttpServletRequest;
@@ -39,7 +38,7 @@ public class AuthenticationService {
                 .lastname(request.getLastname())
                 .email(request.getEmail())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(Role.USER)
+                .role(request.getRole())
                 .build();
         var savedUser = repository.save(user);
         var jwtToken = jwtService.generateToken(user);
